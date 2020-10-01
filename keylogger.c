@@ -121,12 +121,18 @@ CGEventRef CGEventCallback(CGEventTapProxy proxy, CGEventType type,
 
     // If any modifiers are set, print them first
     print_modifier(&mdf, outfile);
-    print_modifier(&mdf, outword);
 
     // Print the human readable key to the logfile.
     bool shift = mdf.rshift || mdf.lshift || mdf.caps;
     fprintf(outfile, "%s\n", convertKeyCode(keyCode, shift));
     fflush(outfile);
+
+    // Thoughts on the word.
+    // We really need to build a buffer that does not flush untill
+    // the return (or possibly other keys) are entered.  If we do
+    // this, we can handle all typo's and corrections that I end
+    // up doing before submitting a line, otherwise half my words
+    // end up being: la[del]s
 
     // Print the word line
     if ((int)keyCode == 36 || (int)keyCode == 49) {
@@ -134,6 +140,14 @@ CGEventRef CGEventCallback(CGEventTapProxy proxy, CGEventType type,
         fflush(outword);
     } else {
         fprintf(outword, "%s", convertKeyCode(keyCode, shift));
+    }
+
+    // Sanity check.  Sometimes the l-ctrl key state is flipped
+    // Check here for both delete and l-ctrl and if found, reset
+    // l-ctrl to be not set.
+    if ((int)keyCode == 51 && mdf.lctrl) {
+        mdf.lctrl = false;
+        fprintf(stderr, "Turned off unexpected l-ctrl key\n");
     }
 
     return event;
@@ -273,7 +287,7 @@ int main(int argc, const char *argv[])
                              CGEventMaskBit(kCGEventKeyUp) |
                              CGEventMaskBit(kCGEventFlagsChanged));
     CFMachPortRef eventTap = CGEventTapCreate(kCGSessionEventTap,
-                                              kCGHeadInsertEventTap, 0,
+                                              kCGHeadInsertEventTap, kCGEventTapOptionDefault,
                                               eventMask,
                                               CGEventCallback, NULL
     );
